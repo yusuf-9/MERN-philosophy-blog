@@ -7,11 +7,10 @@ const bcrypt = require("bcrypt")
 const cookieParser = require("cookie-parser")
 const nodeMailer = require("nodemailer")
 const path = require("path")
+const fs = require("fs")
 const mongoose = require("mongoose")
-const fileUpload = require("express-fileupload")
 const Article = require("./articleSchema")
 const User = require("./userSchema")
-const { networkInterfaces } = require("os")
 
 // Initializing env
 env.config()
@@ -28,9 +27,6 @@ mongoose.connect(process.env.MONGO_ID, () => {
 app.use(express.urlencoded({ extended: false }))
 app.use(express.json())
 app.use(cookieParser())
-app.use(fileUpload())
-app.use(cors({ credentials: true, origin: "http://localhost:3000" }))
-
 
 // Setting up nodemailer
 const transporter = nodeMailer.createTransport({
@@ -240,21 +236,19 @@ app.get("/verifyAPI/:id", async (req, res) => {
     let { id } = req.params;
     try {
         const user = await User.findOne({ _id: id });
-        user.verified = true;
-        await user.save()
-        if (user.email == "yusufahmed195@gmail.com") {
-            const token = jwt.sign({ name: user.name, role: "admin", email: user.email }, "secret")
-            res.cookie("token", token, { httpOnly: true });
-            res.json({ status: "success" })
+        if (user.verified === true) {
+            res.json({ status: "failed", data: "Your email has already been verified" })
         }
         else {
-            const token = jwt.sign({ name: user.name, role: "user", email: user.email }, "secret")
-            res.cookie("token", token, { httpOnly: true });
-            res.json({ status: "success" })
+            user.verified = true;
+            await user.save()
+                const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, "secret")
+                res.cookie("token", token, { httpOnly: true });
+                res.json({ status: "success" })      
         }
     } catch (err) {
         if (err) {
-            res.json({ status: "failed", data: err })
+            res.json({ status: "error", data: err })
         }
     }
 
@@ -269,7 +263,7 @@ app.get("/register/:email", async (req, res) => {
             to: user.email,
             subject: "Email verification",
             html: `<p>Click the following link to verify your account</p>
-                <p><a href="http://localhost:3000/verify/${user._id}">Verify email</a></p>`
+                <p><a href="http://localhost:5000/verify/${user._id}">Verify email</a></p>`
         }).then((x) => {
             return res.json({ status: "success" })
         })
@@ -371,15 +365,12 @@ app.post("/login", async (req, response) => {
 
 app.post("/writeArticle", adminOnlyPages, async (req, res) => {
     const x = JSON.parse(JSON.stringify(req.body))
-    let { heading, description, first_half, second_half, category } = x;
+    let { heading, description, first_half, second_half, category, image } = x;
     try {
-        let file = req.files.image;
-        let fileName = file.name;
-        file.mv(path.resolve(__dirname, `frontend/build/ArticleImages/${fileName}`))
         let newArticle = new Article({
             heading: heading,
             description: description,
-            image: fileName,
+            image: image,
             first_half: first_half,
             second_half: second_half,
             category: category,
@@ -391,9 +382,9 @@ app.post("/writeArticle", adminOnlyPages, async (req, res) => {
     } catch (err) {
         if (err) {
             res.json({ status: "failed", data: err })
+            console.log(err)
         }
     }
-
 })
 
 app.post("/contact", (req, res) => {
@@ -432,15 +423,12 @@ app.delete("/:articleName", adminOnlyPages, async (req, res) => {
 app.post("/edit/:articleName", adminOnlyPages, async (req, res) => {
     let { articleName } = req.params;
     const x = JSON.parse(JSON.stringify(req.body))
-    let { heading, description, first_half, second_half, category } = x;
+    let { heading, description, first_half, second_half, category, image } = x;
     try {
-        let file = req.files.image;
-        let fileName = file.name;
-        file.mv(path.resolve(__dirname, `./frontend/public/ArticleImages/${fileName}`))
         let newArticle = {
             heading: heading,
             description: description,
-            image: fileName,
+            image: image,
             first_half: first_half,
             second_half: second_half,
             category: category,
