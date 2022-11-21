@@ -263,7 +263,7 @@ app.get("/register/:email", async (req, res) => {
             to: user.email,
             subject: "Email verification",
             html: `<p>Click the following link to verify your account</p>
-                <p><a href="https://tame-red-sea-urchin-belt.cyclic.app/verify/${user._id}">Verify email</a></p>`
+                <p><a href="https://theskeptichawk.cyclic.app/verify/${user._id}">Verify email</a></p>`
         }).then((x) => {
             return res.json({ status: "success" })
         })
