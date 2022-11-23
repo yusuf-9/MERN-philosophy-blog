@@ -11,6 +11,7 @@ const fs = require("fs")
 const mongoose = require("mongoose")
 const Article = require("./articleSchema")
 const User = require("./userSchema")
+app.use(cors())
 
 // Initializing env
 env.config()
