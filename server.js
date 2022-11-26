@@ -50,7 +50,7 @@ transporter.verify((error, success) => {
 function addingUserCredsToReq(req, res, next) {
     const { token } = req.cookies
     if (token) {
-        const verified = jwt.verify(token, "secret", (err, data) => {
+        const verified = jwt.verify(token, process.env.JWT, (err, data) => {
             if (err) {
                 return next()
             }
@@ -67,7 +67,7 @@ function addingUserCredsToReq(req, res, next) {
 function adminOnlyPages(req, res, next) {
     let variable = 0
     const { token } = req.cookies
-    const verified = jwt.verify(token, "secret", (err, data) => {
+    const verified = jwt.verify(token, process.env.JWT, (err, data) => {
         if (err) {
 
         }
@@ -90,7 +90,7 @@ function adminOnlyPages(req, res, next) {
 function loggedOutOnly(req, res, next) {
     let variable = 0
     const { token } = req.cookies
-    const verified = jwt.verify(token, "secret", (err, data) => {
+    const verified = jwt.verify(token, process.env.JWT, (err, data) => {
         if (err) {
         }
         else {
@@ -123,7 +123,7 @@ app.get("/user", (req, res) => {
     let variable = 0;
     const { token } = req.cookies
     if (token) {
-        const verified = jwt.verify(token, "secret", (err, data) => {
+        const verified = jwt.verify(token, process.env.JWT, (err, data) => {
             if (err) {
             }
             else {
@@ -222,7 +222,7 @@ app.get("/logout", (req, res) => {
     if (!token) {
         return res.json({ status: "success" })
     }
-    const verified = jwt.verify(token, "secret", (err, data) => {
+    const verified = jwt.verify(token, process.env.JWT, (err, data) => {
         if (err) {
         }
         else {
@@ -245,7 +245,7 @@ app.get("/verifyAPI/:id", async (req, res) => {
         else {
             user.verified = true;
             await user.save()
-            const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, "secret")
+            const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, process.env.JWT)
             res.cookie("token", token, { httpOnly: true });
             res.json({ status: "success" })
         }
@@ -357,7 +357,7 @@ app.post("/login", async (req, response) => {
                 }
                 else if (res) {
                     if (user.verified === true) {
-                        const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, "secret")
+                        const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, process.env.JWT)
                         response.cookie("token", token, { httpOnly: true });
                         response.json({ status: "login success" })
                     }
