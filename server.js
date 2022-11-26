@@ -6,14 +6,17 @@ const cors = require("cors")
 const bcrypt = require("bcrypt")
 const cookieParser = require("cookie-parser")
 const nodeMailer = require("nodemailer")
+const uuid = require("uuid")
 const path = require("path")
-const fs = require("fs")
 const mongoose = require("mongoose")
 const Article = require("./articleSchema")
 const User = require("./userSchema")
+const googleUser = require("./googleUserSchema")
+const userActions = require("./userActions")
 
-// Initializing env
+// Initializing env and cors
 env.config()
+// app.use(cors({credentials:true, origin:"http://localhost:3000"}))
 
 // PORT
 const PORT = process.env.PORT || 5000;
@@ -185,7 +188,7 @@ app.get("/fetcharticles/?", async (req, res) => {
 app.get("/readarticle/:articleName", addingUserCredsToReq, async (req, res) => {
     let { articleName } = req.params;
     try {
-        const main = await Article.findOne({ heading: articleName.split("_").join(" ") })
+        const main = await Article.findOne({ link: articleName })
         const currentViews = main.views;
         main.views = currentViews + 1
         await main.save()
@@ -242,9 +245,9 @@ app.get("/verifyAPI/:id", async (req, res) => {
         else {
             user.verified = true;
             await user.save()
-                const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, "secret")
-                res.cookie("token", token, { httpOnly: true });
-                res.json({ status: "success" })      
+            const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, "secret")
+            res.cookie("token", token, { httpOnly: true });
+            res.json({ status: "success" })
         }
     } catch (err) {
         if (err) {
@@ -263,7 +266,7 @@ app.get("/register/:email", async (req, res) => {
             to: user.email,
             subject: "Email verification",
             html: `<p>Click the following link to verify your account</p>
-                <p><a href="https://theskeptichawk.cyclic.app/verify/${user._id}">Verify email</a></p>`
+                <p><a href="http://localhost:5000/verify/${user._id}">Verify email</a></p>`
         }).then((x) => {
             return res.json({ status: "success" })
         })
@@ -278,7 +281,7 @@ app.get("/register/:email", async (req, res) => {
 app.get("/edit/:articleName", adminOnlyPages, async (req, res) => {
     let { articleName } = req.params;
     try {
-        const article = await Article.find({ heading: articleName.split("_").join(" ") })
+        const article = await Article.find({ link: articleName })
         res.json({ data: article[0], status: "success" })
     } catch (err) {
         if (err) {
@@ -286,6 +289,22 @@ app.get("/edit/:articleName", adminOnlyPages, async (req, res) => {
         }
     }
 
+})
+
+
+app.post("/checkUserAction", async(req, res)=>{
+    const {uid} = req.body
+    try{
+        const userExists = await userActions.findOne({unique_id:uid});
+        if(userExists){
+            res.json({status: "success"})
+        }
+        else{
+            res.json({status:"failed"})
+        }
+    }catch(err){
+        res.json({status:"error", data: err})
+    }
 })
 
 app.post("/register", async (req, res) => {
@@ -363,6 +382,56 @@ app.post("/login", async (req, response) => {
 
 })
 
+app.post("/resetPassword", async (req, res) => {
+    const { email, password } = req.body
+    if(email && !password){
+    try {
+        const userExists = await User.findOne({ email: email })
+        if (userExists) {
+            const userActionExists = await userActions.findOne({email: email})
+            var uid = uuid.v4()
+            if(userActionExists){
+                userActionExists.unique_id = uid;
+                await userActionExists.save()
+            }
+            else{
+                const user = new userActions({
+                    email: email,
+                    unique_id: uid,
+                })
+                await user.save();
+            }
+            transporter.sendMail({
+                from: process.env.EMAIL,
+                to: userExists.email,
+                subject: "Reset your password",
+                html: `<p>Click the following link to reset your password</p>
+                    <p><a href="http://localhost:3000/reset/${uid}">Reset password</a></p><p>The link will expire in 24 hours</p>`
+            }).then((x) => {
+                return res.json({ status: "success" })
+            })
+        }
+        else {
+            res.json({ status: "failed", data: "Email not registered. Please enter valid email" })
+        }
+    } catch (err) {
+        res.json({ status: "error", data: err })
+    }}
+    else if (password && !email){
+        const {uid} = req.body
+        console.log(uid)
+        const userAction = await userActions.findOne({unique_id: uid});
+        const email = userAction.email;
+        const user = await User.findOne({email:email})
+        const hashedPassword = await bcrypt.hash(password, 10)
+        user.password = hashedPassword;
+        await user.save()
+        await userActions.deleteOne({unique_id:uid})
+        res.json({status: "success"})
+    }
+
+})
+
 app.post("/writeArticle", adminOnlyPages, async (req, res) => {
     const x = JSON.parse(JSON.stringify(req.body))
     let { heading, description, first_half, second_half, category, image } = x;
@@ -374,6 +443,7 @@ app.post("/writeArticle", adminOnlyPages, async (req, res) => {
             first_half: first_half,
             second_half: second_half,
             category: category,
+            link:heading.split(" ").join("_").replace("?", ""),
             last_updated: Date.now(),
             timeToRead: Math.ceil((first_half.concat(second_half).split(" ").length / 4) / 60)
         })
@@ -432,6 +502,7 @@ app.post("/edit/:articleName", adminOnlyPages, async (req, res) => {
             first_half: first_half,
             second_half: second_half,
             category: category,
+            link:heading.split(" ").join("_").replace("?", ""),
             last_updated: Date.now(),
             date_created: `${Date().split(" ")[2]}th ${Date().split(" ")[1]}, ${Date().split(" ")[3]}`,
             timeToRead: Math.ceil((first_half.concat(second_half).split(" ").length / 4) / 60)

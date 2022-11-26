@@ -27,6 +27,11 @@ const Article = new mongoose.Schema({
         type: String,
         required: true
     },
+    link:{
+        type: String,
+        unique: true,
+        required: true
+    },
     timeToRead:{
         type: Number,
         required: true
