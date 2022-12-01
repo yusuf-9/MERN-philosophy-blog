@@ -192,9 +192,9 @@ app.get("/readarticle/:articleName", addingUserCredsToReq, async (req, res) => {
         const currentViews = main.views;
         main.views = currentViews + 1
         await main.save()
-        const articleCount = await Article.find({ heading: { $ne: articleName.split("_").join(" ") } }).count()
+        const articleCount = await Article.find({ link: { $ne: articleName } }).count()
         var random = Math.floor(Math.random() * (articleCount.length - 3))
-        const moreArticles = await Article.find({ heading: { $ne: articleName.split("_").join(" ") } }, { heading: 1, image: 1, date_created: 1, timeToRead: 1, category: 1 }).skip(random).limit(3)
+        const moreArticles = await Article.find({ link: { $ne: articleName } }, { heading: 1, image: 1, date_created: 1, timeToRead: 1, category: 1 }).skip(random).limit(3)
         var liked;
         if (req.user) {
             main.likes.forEach((x) => { if (x.email == req.user.email) { liked = "active" } })
@@ -239,8 +239,11 @@ app.get("/verifyAPI/:id", async (req, res) => {
     let { id } = req.params;
     try {
         const user = await User.findOne({ _id: id });
+        if(!user){
+           return  res.json({status: "failed", data: "Email not registered"})
+        }
         if (user.verified === true) {
-            res.json({ status: "failed", data: "Your email has already been verified" })
+            return res.json({ status: "failed", data: "Your email has already been verified" })
         }
         else {
             user.verified = true;
@@ -261,18 +264,27 @@ app.get("/register/:email", async (req, res) => {
     let { email } = req.params;
     try {
         const user = await User.findOne({ email: email })
+        if(!user){
+            return res.json({status: "failed", data: "Email not registered"})
+        }
+        else if(user.verified === true){
+            return res.json({status: "failed", data: "Email already registered and verified. Please log in with this email."})
+        }
+        else{
+
         transporter.sendMail({
             from: process.env.EMAIL,
             to: user.email,
             subject: "Email verification",
             html: `<p>Click the following link to verify your account</p>
-                <p><a href="http://localhost:5000/verify/${user._id}">Verify email</a></p>`
+                <p><a href="https://theskeptichawk.cyclic.app/verify/${user._id}">Verify email</a></p>`
         }).then((x) => {
             return res.json({ status: "success" })
         })
+    }
     } catch (err) {
         if (err) {
-            res.json({ status: "failed" })
+            res.json({ status: "error", data: "Something went wrong..." })
         }
     }
 
@@ -290,7 +302,6 @@ app.get("/edit/:articleName", adminOnlyPages, async (req, res) => {
     }
 
 })
-
 
 app.post("/checkUserAction", async(req, res)=>{
     const {uid} = req.body
@@ -406,7 +417,7 @@ app.post("/resetPassword", async (req, res) => {
                 to: userExists.email,
                 subject: "Reset your password",
                 html: `<p>Click the following link to reset your password</p>
-                    <p><a href="http://localhost:3000/reset/${uid}">Reset password</a></p><p>The link will expire in 24 hours</p>`
+                    <p><a href="https://theskeptichawk.cyclic.app/reset/${uid}">Reset password</a></p><p>The link will expire in 24 hours</p>`
             }).then((x) => {
                 return res.json({ status: "success" })
             })
@@ -480,7 +491,7 @@ app.post("/contact", (req, res) => {
 app.delete("/:articleName", adminOnlyPages, async (req, res) => {
     let { articleName } = req.params;
     try {
-        await Article.deleteOne({ heading: articleName.split("_").join(" ") })
+        await Article.deleteOne({ link: articleName})
         res.json({ status: "success" })
     } catch (err) {
         if (err) {
@@ -508,7 +519,7 @@ app.post("/edit/:articleName", adminOnlyPages, async (req, res) => {
             timeToRead: Math.ceil((first_half.concat(second_half).split(" ").length / 4) / 60)
         }
 
-        await Article.updateOne({ heading: articleName.split("_").join(" ") }, newArticle)
+        await Article.updateOne({ link : articleName }, newArticle)
         res.json({ status: "success" })
     } catch (err) {
         if (err) {
@@ -523,19 +534,22 @@ app.post("/like/:articleName", addingUserCredsToReq, async (req, res) => {
     const { articleName } = req.params;
     const { action } = req.body;
     try {
+        if(!req.user){
+            return res.json({status: "failed", data: "User not logged in"})
+        }
         if (action == "like" && req.user) {
             const like = {
                 email: req.user.email,
                 name: req.user.name,
                 time: Date.now()
             }
-            var article = await Article.find({ heading: articleName.split("_").join(" ") })
+            var article = await Article.find({ link: articleName })
             article[0].likes.push(like)
             await article[0].save()
             return res.json({ status: "success" })
         }
         else if (action == "unlike" && req.user) {
-            var article = await Article.find({ heading: articleName.split("_").join(" ") })
+            var article = await Article.find({ link: articleName })
             article[0].likes = article[0].likes.filter((x) => { return x.email != req.user.email })
             await article[0].save()
             return res.json({ status: "success" })
@@ -555,19 +569,22 @@ app.post("/comment/:articleName", addingUserCredsToReq, async (req, res) => {
     const { articleName } = req.params;
     const { comment, action } = req.body;
     try {
+        if(!user){
+            return res.json({status: "failed", data:"User not logged in"})
+        }
         if (action == "post" && req.user) {
             const newComment = {
                 email: req.user.email,
                 name: req.user.name,
                 comment: comment
             }
-            var article = await Article.find({ heading: articleName.split("_").join(" ") })
+            var article = await Article.find({ link: articleName })
             article[0].comments.push(newComment)
             await article[0].save()
             return res.json({ status: "success", data: newComment })
         }
         else if (action == "delete" && req.user) {
-            var article = await Article.find({ heading: articleName.split("_").join(" ") })
+            var article = await Article.find({ link: articleName })
             article[0].comments = article[0].comments.filter((x) => {
                 return x.comment != comment
             })
