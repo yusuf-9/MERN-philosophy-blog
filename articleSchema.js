@@ -38,7 +38,7 @@ const Article = new mongoose.Schema({
     },
     date_created:{
         type: String,
-        default: `${Date().split(" ")[2]}th ${Date().split(" ")[1]}, ${Date().split(" ")[3]}`
+        default: `${Date().split(" ")[2]} ${Date().split(" ")[1]}, ${Date().split(" ")[3]}`
     },
     last_updated:{
         type: Date,
