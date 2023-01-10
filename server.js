@@ -16,7 +16,7 @@ const userActions = require("./userActions")
 
 // Initializing env and cors
 env.config()
-// app.use(cors({credentials:true, origin:"http://localhost:3000"}))
+// app.use(cors({ credentials: true, origin: "http://localhost:3000" }))
 
 // PORT
 const PORT = process.env.PORT || 5000;
@@ -193,7 +193,7 @@ app.get("/readarticle/:articleName", addingUserCredsToReq, async (req, res) => {
         main.views = currentViews + 1
         await main.save()
         const articleCount = await Article.find({ link: { $ne: articleName } }).count()
-        var random = Math.floor(Math.random() * (articleCount.length - 3))
+        var random = Math.floor(Math.random() * (articleCount - 3))
         const moreArticles = await Article.find({ link: { $ne: articleName } }, { heading: 1, image: 1, date_created: 1, timeToRead: 1, category: 1 }).skip(random).limit(3)
         var liked;
         if (req.user) {
@@ -239,8 +239,8 @@ app.get("/verifyAPI/:id", async (req, res) => {
     let { id } = req.params;
     try {
         const user = await User.findOne({ _id: id });
-        if(!user){
-           return  res.json({status: "failed", data: "Email not registered"})
+        if (!user) {
+            return res.json({ status: "failed", data: "Email not registered" })
         }
         if (user.verified === true) {
             return res.json({ status: "failed", data: "Your email has already been verified" })
@@ -264,24 +264,24 @@ app.get("/register/:email", async (req, res) => {
     let { email } = req.params;
     try {
         const user = await User.findOne({ email: email })
-        if(!user){
-            return res.json({status: "failed", data: "Email not registered"})
+        if (!user) {
+            return res.json({ status: "failed", data: "Email not registered" })
         }
-        else if(user.verified === true){
-            return res.json({status: "failed", data: "Email already registered and verified. Please log in with this email."})
+        else if (user.verified === true) {
+            return res.json({ status: "failed", data: "Email already registered and verified. Please log in with this email." })
         }
-        else{
+        else {
 
-        transporter.sendMail({
-            from: process.env.EMAIL,
-            to: user.email,
-            subject: "Email verification",
-            html: `<p>Click the following link to verify your account</p>
+            transporter.sendMail({
+                from: process.env.EMAIL,
+                to: user.email,
+                subject: "Email verification",
+                html: `<p>Click the following link to verify your account</p>
                 <p><a href="https://theskeptichawk.cyclic.app/verify/${user._id}">Verify email</a></p>`
-        }).then((x) => {
-            return res.json({ status: "success" })
-        })
-    }
+            }).then((x) => {
+                return res.json({ status: "success" })
+            })
+        }
     } catch (err) {
         if (err) {
             res.json({ status: "error", data: "Something went wrong..." })
@@ -303,18 +303,18 @@ app.get("/edit/:articleName", adminOnlyPages, async (req, res) => {
 
 })
 
-app.post("/checkUserAction", async(req, res)=>{
-    const {uid} = req.body
-    try{
-        const userExists = await userActions.findOne({unique_id:uid});
-        if(userExists){
-            res.json({status: "success"})
+app.post("/checkUserAction", async (req, res) => {
+    const { uid } = req.body
+    try {
+        const userExists = await userActions.findOne({ unique_id: uid });
+        if (userExists) {
+            res.json({ status: "success" })
         }
-        else{
-            res.json({status:"failed"})
+        else {
+            res.json({ status: "failed" })
         }
-    }catch(err){
-        res.json({status:"error", data: err})
+    } catch (err) {
+        res.json({ status: "error", data: err })
     }
 })
 
@@ -369,7 +369,7 @@ app.post("/login", async (req, response) => {
                 else if (res) {
                     if (user.verified === true) {
                         const token = jwt.sign({ name: user.name.split(" ")[0] + " " + user.name.split(" ")[1], role: user.role, email: user.email }, process.env.JWT)
-                        response.cookie("token", token, { httpOnly: true });
+                        response.cookie("token", token, { httpOnly: true, secure: true, sameSite: "strict" });
                         response.json({ status: "login success" })
                     }
                     else {
@@ -395,50 +395,51 @@ app.post("/login", async (req, response) => {
 
 app.post("/resetPassword", async (req, res) => {
     const { email, password } = req.body
-    if(email && !password){
-    try {
-        const userExists = await User.findOne({ email: email })
-        if (userExists) {
-            const userActionExists = await userActions.findOne({email: email})
-            var uid = uuid.v4()
-            if(userActionExists){
-                userActionExists.unique_id = uid;
-                await userActionExists.save()
-            }
-            else{
-                const user = new userActions({
-                    email: email,
-                    unique_id: uid,
-                })
-                await user.save();
-            }
-            transporter.sendMail({
-                from: process.env.EMAIL,
-                to: userExists.email,
-                subject: "Reset your password",
-                html: `<p>Click the following link to reset your password</p>
+    if (email && !password) {
+        try {
+            const userExists = await User.findOne({ email: email })
+            if (userExists) {
+                const userActionExists = await userActions.findOne({ email: email })
+                var uid = uuid.v4()
+                if (userActionExists) {
+                    userActionExists.unique_id = uid;
+                    await userActionExists.save()
+                }
+                else {
+                    const user = new userActions({
+                        email: email,
+                        unique_id: uid,
+                    })
+                    await user.save();
+                }
+                transporter.sendMail({
+                    from: process.env.EMAIL,
+                    to: userExists.email,
+                    subject: "Reset your password",
+                    html: `<p>Click the following link to reset your password</p>
                     <p><a href="https://theskeptichawk.cyclic.app/reset/${uid}">Reset password</a></p><p>The link will expire in 24 hours</p>`
-            }).then((x) => {
-                return res.json({ status: "success" })
-            })
+                }).then((x) => {
+                    return res.json({ status: "success" })
+                })
+            }
+            else {
+                res.json({ status: "failed", data: "Email not registered. Please enter valid email" })
+            }
+        } catch (err) {
+            res.json({ status: "error", data: err })
         }
-        else {
-            res.json({ status: "failed", data: "Email not registered. Please enter valid email" })
-        }
-    } catch (err) {
-        res.json({ status: "error", data: err })
-    }}
-    else if (password && !email){
-        const {uid} = req.body
+    }
+    else if (password && !email) {
+        const { uid } = req.body
         console.log(uid)
-        const userAction = await userActions.findOne({unique_id: uid});
+        const userAction = await userActions.findOne({ unique_id: uid });
         const email = userAction.email;
-        const user = await User.findOne({email:email})
+        const user = await User.findOne({ email: email })
         const hashedPassword = await bcrypt.hash(password, 10)
         user.password = hashedPassword;
         await user.save()
-        await userActions.deleteOne({unique_id:uid})
-        res.json({status: "success"})
+        await userActions.deleteOne({ unique_id: uid })
+        res.json({ status: "success" })
     }
 
 })
@@ -454,7 +455,7 @@ app.post("/writeArticle", adminOnlyPages, async (req, res) => {
             first_half: first_half,
             second_half: second_half,
             category: category,
-            link:heading.split(" ").join("_").replace("?", ""),
+            link: heading.split(" ").join("_").replace("?", ""),
             last_updated: Date.now(),
             timeToRead: Math.ceil((first_half.concat(second_half).split(" ").length / 4) / 60)
         })
@@ -491,7 +492,7 @@ app.post("/contact", (req, res) => {
 app.delete("/:articleName", adminOnlyPages, async (req, res) => {
     let { articleName } = req.params;
     try {
-        await Article.deleteOne({ link: articleName})
+        await Article.deleteOne({ link: articleName })
         res.json({ status: "success" })
     } catch (err) {
         if (err) {
@@ -513,13 +514,13 @@ app.post("/edit/:articleName", adminOnlyPages, async (req, res) => {
             first_half: first_half,
             second_half: second_half,
             category: category,
-            link:heading.split(" ").join("_").replace("?", ""),
+            link: heading.split(" ").join("_").replace("?", ""),
             last_updated: Date.now(),
             date_created: `${Date().split(" ")[2]}th ${Date().split(" ")[1]}, ${Date().split(" ")[3]}`,
             timeToRead: Math.ceil((first_half.concat(second_half).split(" ").length / 4) / 60)
         }
 
-        await Article.updateOne({ link : articleName }, newArticle)
+        await Article.updateOne({ link: articleName }, newArticle)
         res.json({ status: "success" })
     } catch (err) {
         if (err) {
@@ -534,8 +535,8 @@ app.post("/like/:articleName", addingUserCredsToReq, async (req, res) => {
     const { articleName } = req.params;
     const { action } = req.body;
     try {
-        if(!req.user){
-            return res.json({status: "failed", data: "User not logged in"})
+        if (!req.user) {
+            return res.json({ status: "failed", data: "User not logged in" })
         }
         if (action == "like" && req.user) {
             const like = {
@@ -569,8 +570,8 @@ app.post("/comment/:articleName", addingUserCredsToReq, async (req, res) => {
     const { articleName } = req.params;
     const { comment, action } = req.body;
     try {
-        if(!user){
-            return res.json({status: "failed", data:"User not logged in"})
+        if (!req.user) {
+            return res.json({ status: "failed", data: "User not logged in" })
         }
         if (action == "post" && req.user) {
             const newComment = {
@@ -593,7 +594,7 @@ app.post("/comment/:articleName", addingUserCredsToReq, async (req, res) => {
         }
     } catch (err) {
         if (err) {
-            res.json({ status: "failed", data: err })
+            res.json({ status: "failed with error", data: err })
         }
     }
 
