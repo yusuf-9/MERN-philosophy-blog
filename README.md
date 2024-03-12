@@ -1,1 +1,1 @@
-A lightweight philosphy blog created using React, Node, Firebase and MongoDB.
+## A lightweight philosphy blog created using React, Node, Firebase and MongoDB.
